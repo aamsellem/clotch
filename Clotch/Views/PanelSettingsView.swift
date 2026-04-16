@@ -117,7 +117,7 @@ struct PanelSettingsView: View {
                     Image(systemName: "link")
                         .font(.system(size: 10))
                         .foregroundStyle(TerminalColors.textTertiary)
-                    Text("github.com/aurelien-amsellem_elvest")
+                    Text("github.com/aamsellem")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(TerminalColors.textTertiary)
                 }

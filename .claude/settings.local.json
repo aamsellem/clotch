@@ -47,7 +47,9 @@
       "Bash(cat)",
       "Bash(rm -f /tmp/clotch-raw-debug.log)",
       "Bash(rm -f /tmp/clotch.sock)",
-      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Clotch-*)"
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Clotch-*)",
+      "Bash(git config *)",
+      "Read(//Users/aamsellem/**)"
     ]
   }
 }
