@@ -18,6 +18,12 @@ struct HookEvent: Decodable {
         case sessionEnd = "SessionEnd"
         case subagentStart = "SubagentStart"
         case subagentEnd = "SubagentEnd"
+        case notification = "Notification"
+        case stopFailure = "StopFailure"
+        case preCompact = "PreCompact"
+        case postCompact = "PostCompact"
+        case taskCreated = "TaskCreated"
+        case taskCompleted = "TaskCompleted"
     }
 
     enum CodingKeys: String, CodingKey {

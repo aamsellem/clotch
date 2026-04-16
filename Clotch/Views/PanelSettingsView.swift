@@ -80,11 +80,39 @@ struct PanelSettingsView: View {
             // Info
             settingsSection("About") {
                 Text("Clotch v1.0.0")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(TerminalColors.textTertiary)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(TerminalColors.textSecondary)
                 Text("Sentiment: NLTagger (on-device, 0 tokens)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(TerminalColors.textTertiary)
+                Text("Sprites from notchi (GPL-3)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(TerminalColors.textTertiary)
+            }
+
+            // Author
+            settingsSection("Author") {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(TerminalColors.blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aurelien Amsellem")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(TerminalColors.text)
+                        Text("Built with Claude Code")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(TerminalColors.textTertiary)
+                    }
+                }
+                HStack(spacing: 8) {
+                    Image(systemName: "link")
+                        .font(.system(size: 10))
+                        .foregroundStyle(TerminalColors.textTertiary)
+                    Text("github.com/sk-ruban/notchi")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(TerminalColors.textTertiary)
+                }
             }
 
             Spacer()

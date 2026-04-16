@@ -92,7 +92,13 @@ final class HookInstaller {
             "PreToolUse",
             "PostToolUse",
             "Stop",
-            "SubagentStop"
+            "SubagentStop",
+            "Notification",
+            "StopFailure",
+            "PreCompact",
+            "PostCompact",
+            "TaskCreated",
+            "TaskCompleted"
         ]
 
         for eventType in eventTypes {

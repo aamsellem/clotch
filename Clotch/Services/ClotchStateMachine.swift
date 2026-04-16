@@ -68,6 +68,50 @@ final class ClotchStateMachine {
         case .subagentEnd:
             session.task = .working
             spinnerVerb = SpinnerVerbs.random(for: nil)
+
+        case .notification:
+            // Claude Code sends Notification when waiting for user (permission prompt)
+            session.task = .waiting
+            spinnerVerb = "Waiting for permission"
+            soundService.playPeekSound()
+            sendMacOSNotification(
+                title: session.projectName ?? "Claude Code",
+                body: "Waiting for your permission"
+            )
+
+        case .stopFailure:
+            session.task = .idle
+            session.currentTool = nil
+            spinnerVerb = "Error"
+            session.activities.append(ActivityItem(kind: .error, text: "API error"))
+            sendMacOSNotification(
+                title: session.projectName ?? "Claude Code",
+                body: "Session stopped with error"
+            )
+
+        case .preCompact:
+            session.task = .compacting
+            spinnerVerb = "Compacting context"
+
+        case .postCompact:
+            session.task = .working
+            spinnerVerb = SpinnerVerbs.random(for: nil)
+
+        case .taskCreated:
+            if let input = event.toolInput,
+               let data = input.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let subject = json["subject"] as? String {
+                session.activities.append(ActivityItem(kind: .taskCreated, text: subject))
+            }
+
+        case .taskCompleted:
+            if let input = event.toolInput,
+               let data = input.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let subject = json["subject"] as? String {
+                session.activities.append(ActivityItem(kind: .taskCompleted, text: subject))
+            }
         }
     }
 
@@ -97,13 +141,19 @@ final class ClotchStateMachine {
         discoverTranscript(for: session)
     }
 
-    /// Tools that require user interaction (permission, question, etc.)
+    /// Tools that immediately require user interaction
     private static let waitingTools: Set<String> = [
         "AskUserQuestion",
     ]
 
+    /// Timer to detect permission prompts (PreToolUse without PostToolUse)
+    private var permissionTimer: Timer?
+
     private func handlePreToolUse(session: SessionData, event: HookEvent) {
-        // Detect tools that wait for user input
+        // Cancel any existing permission timer
+        permissionTimer?.invalidate()
+
+        // Detect tools that immediately wait for user input
         if let tool = event.tool, Self.waitingTools.contains(tool) {
             session.task = .waiting
             session.currentTool = tool
@@ -113,11 +163,21 @@ final class ClotchStateMachine {
             session.task = .working
             session.currentTool = event.tool
             spinnerVerb = SpinnerVerbs.random(for: event.tool)
+
+            // Start a timer: if no PostToolUse within 3s, assume permission prompt
+            let sessionId = session.id
+            permissionTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                if let s = self.sessionStore.sessions[sessionId], s.task == .working {
+                    s.task = .waiting
+                    self.spinnerVerb = "Waiting for permission"
+                    self.soundService.playPeekSound()
+                }
+            }
         }
         session.cancelSleepTimer()
 
         if let tool = event.tool {
-            // Parse task-related tool uses for the activity feed
             let activityItem = parseTaskActivity(tool: tool, input: event.toolInput) ??
                 ActivityItem(kind: .toolUse, text: tool, detail: event.toolInput)
             session.activities.append(activityItem)
@@ -125,6 +185,9 @@ final class ClotchStateMachine {
     }
 
     private func handlePostToolUse(session: SessionData, event: HookEvent) {
+        // Cancel permission timer — tool executed, no longer waiting
+        permissionTimer?.invalidate()
+        permissionTimer = nil
         session.task = .working
         session.currentTool = nil
         spinnerVerb = SpinnerVerbs.random(for: nil)
@@ -137,8 +200,14 @@ final class ClotchStateMachine {
 
         session.activities.append(ActivityItem(kind: .info, text: "Task completed"))
 
-        // Play completion sound
+        // Play completion sound + macOS notification when terminal not focused
         soundService.playNotification(for: .stop)
+        if !(terminalFocusDetector.isTerminalFocused) {
+            sendMacOSNotification(
+                title: session.projectName ?? "Claude Code",
+                body: "Task completed"
+            )
+        }
 
         // Schedule sleep after inactivity
         session.scheduleSleep()
@@ -238,5 +307,15 @@ final class ClotchStateMachine {
         default:
             return nil
         }
+    }
+
+    // MARK: - macOS Notifications
+
+    private func sendMacOSNotification(title: String, body: String) {
+        let notification = NSUserNotification()
+        notification.title = title
+        notification.informativeText = body
+        notification.soundName = nil  // Sound handled separately by SoundService
+        NSUserNotificationCenter.default.deliver(notification)
     }
 }
