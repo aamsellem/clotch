@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(gh api *)",
+      "Bash(curl -s -X POST \"http://221.21.106.12/api/notify\" -H \"Content-Type: application/json\" -d '{\"text\":\"notchi repo analysis done\",\"color\":\"#00FF88\",\"duration\":8}')",
+      "Bash(xcodegen generate *)",
+      "Bash(xcodebuild -project Clotch.xcodeproj -scheme Clotch -configuration Debug build)",
+      "Bash(xcodebuild -runFirstLaunch)",
+      "Bash(xcodebuild -project /Users/aamsellem/dev/clotch/Clotch.xcodeproj -scheme Clotch -configuration Debug build)",
+      "Bash(git init *)"
+    ]
+  }
+}
