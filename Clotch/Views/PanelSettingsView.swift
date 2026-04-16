@@ -57,6 +57,14 @@ struct PanelSettingsView: View {
                 }
             }
 
+            // System
+            settingsSection("System") {
+                Toggle("Launch at login", isOn: Binding(
+                    get: { settings.launchAtLogin },
+                    set: { settings.launchAtLogin = $0 }
+                ))
+            }
+
             // Hook status
             settingsSection("Hooks") {
                 let installer = HookInstaller()
