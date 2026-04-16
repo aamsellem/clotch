@@ -19,7 +19,7 @@ enum ClotchTask: String, CaseIterable {
     }
 
     /// The sprite sheet asset name for this task + emotion combo.
-    /// Notchi sprites: {task}_{emotion} with 6 frames of 64x64.
+    /// Sprite sheets: {task}_{emotion} with 6 frames of 64x64.
     func spriteAsset(for emotion: EmotionState.Emotion) -> String {
         let taskPrefix: String
         switch self {
@@ -42,7 +42,7 @@ enum ClotchTask: String, CaseIterable {
         let name = "\(taskPrefix)_\(emotionSuffix)"
         let fallback = "\(taskPrefix)_neutral"
 
-        // These combos exist in notchi assets:
+        // Available sprite combos:
         let validCombos: Set<String> = [
             "idle_neutral", "idle_happy", "idle_sad", "idle_sob",
             "working_neutral", "working_happy", "working_sad", "working_sob",

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Displays an animated sprite for a session.
-/// Uses notchi sprite sheets: {task}_{emotion} with 6 frames of 64x64.
+/// Uses sprite sheets: {task}_{emotion} with 6 frames of 64x64.
 struct SessionSpriteView: View {
     let session: SessionData
 

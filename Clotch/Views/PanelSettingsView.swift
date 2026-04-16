@@ -85,7 +85,7 @@ struct PanelSettingsView: View {
                 Text("Sentiment: NLTagger (on-device, 0 tokens)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(TerminalColors.textTertiary)
-                Text("Sprites from notchi (GPL-3)")
+                Text("On-device sentiment (NLTagger)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(TerminalColors.textTertiary)
             }
@@ -109,7 +109,7 @@ struct PanelSettingsView: View {
                     Image(systemName: "link")
                         .font(.system(size: 10))
                         .foregroundStyle(TerminalColors.textTertiary)
-                    Text("github.com/sk-ruban/notchi")
+                    Text("github.com/aurelien-amsellem_elvest")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(TerminalColors.textTertiary)
                 }

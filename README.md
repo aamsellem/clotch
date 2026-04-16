@@ -2,7 +2,7 @@
 
 Compagnon macOS pour Claude Code — un petit personnage animé vit dans le notch de votre MacBook et réagit en temps réel à votre activité.
 
-Inspiré de [notchi](https://github.com/sk-ruban/notchi), repensé pour la **sécurité** et l'**économie de tokens**.
+Repensé pour la **sécurité** et l'**économie de tokens** — 0 appel API, tout reste on-device.
 
 ## Fonctionnalités
 
@@ -17,12 +17,12 @@ Inspiré de [notchi](https://github.com/sk-ruban/notchi), repensé pour la **sé
 
 ## Sécurité
 
-| | Notchi | Clotch |
+| | Autres apps | Clotch |
 |---|---|---|
-| Sentiment | API Claude Haiku (tokens) | NLTagger on-device (0 token) |
-| Credentials | API key dans Keychain | Aucune clé requise |
-| Socket | `/tmp/notchi.sock` | `/tmp/clotch.sock` (chmod 600) |
-| Données envoyées | Prompts vers API Anthropic | Rien — tout reste local |
+| Sentiment | API cloud (tokens) | NLTagger on-device (0 token) |
+| Credentials | API key requise | Aucune clé requise |
+| Socket | Variable | `/tmp/clotch.sock` (chmod 600) |
+| Données envoyées | Prompts vers le cloud | Rien — tout reste local |
 
 ## Prérequis
 
