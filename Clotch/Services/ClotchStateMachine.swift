@@ -146,13 +146,7 @@ final class ClotchStateMachine {
         "AskUserQuestion",
     ]
 
-    /// Timer to detect permission prompts (PreToolUse without PostToolUse)
-    private var permissionTimer: Timer?
-
     private func handlePreToolUse(session: SessionData, event: HookEvent) {
-        // Cancel any existing permission timer
-        permissionTimer?.invalidate()
-
         // Detect tools that immediately wait for user input
         if let tool = event.tool, Self.waitingTools.contains(tool) {
             session.task = .waiting
@@ -163,17 +157,6 @@ final class ClotchStateMachine {
             session.task = .working
             session.currentTool = event.tool
             spinnerVerb = SpinnerVerbs.random(for: event.tool)
-
-            // Start a timer: if no PostToolUse within 3s, assume permission prompt
-            let sessionId = session.id
-            permissionTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-                guard let self = self else { return }
-                if let s = self.sessionStore.sessions[sessionId], s.task == .working {
-                    s.task = .waiting
-                    self.spinnerVerb = "Waiting for permission"
-                    self.soundService.playPeekSound()
-                }
-            }
         }
         session.cancelSleepTimer()
 
@@ -185,9 +168,6 @@ final class ClotchStateMachine {
     }
 
     private func handlePostToolUse(session: SessionData, event: HookEvent) {
-        // Cancel permission timer — tool executed, no longer waiting
-        permissionTimer?.invalidate()
-        permissionTimer = nil
         session.task = .working
         session.currentTool = nil
         spinnerVerb = SpinnerVerbs.random(for: nil)

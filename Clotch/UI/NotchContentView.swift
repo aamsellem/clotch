@@ -23,14 +23,17 @@ struct NotchContentView: View {
 
     @State private var isHovering = false
 
-    private var notchWidth: CGFloat { panelManager.notchSize.width }
+    private let notchWidth: CGFloat = 220
     private var notchHeight: CGFloat { panelManager.notchSize.height }
 
-    // Dynamic size: collapsed = notch size, expanded = larger panel
+    // Extra width when peeking (sprite extends to the right)
+    private let peekExtension: CGFloat = 50
+
+    // Dynamic size: collapsed = notch size, expanded = larger panel, peek = wider
     private var currentWidth: CGFloat {
-        panelManager.isExpanded
-            ? NotchConstants.expandedSize.width
-            : notchWidth + (isHovering ? 16 : 0)
+        if panelManager.isExpanded { return NotchConstants.expandedSize.width }
+        let base = notchWidth + (isHovering ? 16 : 0)
+        return shouldPeek ? base + peekExtension : base
     }
     private var currentHeight: CGFloat {
         panelManager.isExpanded
@@ -52,72 +55,22 @@ struct NotchContentView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // Main notch-shaped content area
-            VStack(spacing: 0) {
-                notchContent
-                    .frame(width: currentWidth, height: currentHeight)
-                    .clipShape(NotchShape(cornerRadius: topRadius, bottomRadius: bottomRadius))
-                    .shadow(
-                        color: .black.opacity(panelManager.isExpanded ? 0.5 : 0.2),
-                        radius: panelManager.isExpanded ? 20 : 6,
-                        y: panelManager.isExpanded ? 8 : 2
-                    )
-                    .animation(.spring(response: 0.35, dampingFraction: 0.82), value: panelManager.isExpanded)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovering)
+        VStack(spacing: 0) {
+            notchContent
+                .frame(width: currentWidth, height: currentHeight)
+                .clipShape(NotchShape(cornerRadius: topRadius, bottomRadius: bottomRadius))
+                .shadow(
+                    color: .black.opacity(panelManager.isExpanded ? 0.5 : 0.2),
+                    radius: panelManager.isExpanded ? 20 : 6,
+                    y: panelManager.isExpanded ? 8 : 2
+                )
+                .animation(.spring(response: 0.35, dampingFraction: 0.82), value: panelManager.isExpanded)
+                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovering)
+                .animation(.spring(response: 0.4, dampingFraction: 0.75), value: shouldPeek)
 
-                Spacer()
-            }
-
-            // Peek sprite — slides out to the right of the notch when waiting
-            if let session = sessionStore.activeSession, !settings.hideSprite {
-                peekSprite(session: session)
-            }
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    /// Which side the peek appears on — alternates based on session id hash
-    private var peekOnRight: Bool {
-        guard let session = sessionStore.activeSession else { return true }
-        return session.id.hashValue % 2 == 0
-    }
-
-    /// Sprite that peeks out from the side of the notch when Claude waits for input.
-    /// Same height as notch, black background, flush — looks like the notch extends.
-    private func peekSprite(session: SessionData) -> some View {
-        let right = peekOnRight
-        let sign: CGFloat = right ? 1 : -1
-        let peekX: CGFloat = shouldPeek ? sign * (currentWidth / 2 + 14) : sign * (currentWidth / 2 - 20)
-
-        return HStack(spacing: 0) {
-            if !right {
-                // Left side: padding on the left, sprite on the right
-                Spacer(minLength: 6)
-            }
-            SessionSpriteView(session: session)
-                .frame(width: 30, height: 30)
-            if right {
-                Spacer(minLength: 6)
-            }
-        }
-        .frame(height: notchHeight)
-        .padding(.horizontal, 4)
-        .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: right ? 0 : 0,
-                bottomLeadingRadius: right ? 0 : notchHeight / 2,
-                bottomTrailingRadius: right ? notchHeight / 2 : 0,
-                topTrailingRadius: right ? 0 : 0
-            )
-            .fill(.black)
-        )
-        .offset(x: peekX, y: 0)
-        .opacity(shouldPeek ? 1 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: shouldPeek)
-        .onTapGesture {
-            panelManager.isExpanded.toggle()
-        }
     }
 
     @ViewBuilder
@@ -156,8 +109,8 @@ struct NotchContentView: View {
     private var headerRow: some View {
         HStack(spacing: 8) {
             if let session = sessionStore.activeSession {
-                // Sprite
-                if !settings.hideSprite {
+                // Sprite (in normal position)
+                if !settings.hideSprite && !shouldPeek {
                     SessionSpriteView(session: session)
                         .frame(width: 24, height: 24)
                 }
@@ -173,6 +126,14 @@ struct NotchContentView: View {
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(Capsule().fill(.white.opacity(0.1)))
+                }
+
+                // Peek: sprite moves to the right extension
+                if shouldPeek && !settings.hideSprite {
+                    Spacer()
+                    SessionSpriteView(session: session)
+                        .frame(width: 28, height: 28)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             } else {
                 // Idle — show Clotch branding
