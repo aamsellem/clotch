@@ -9,6 +9,13 @@ struct SessionListView: View {
             HStack(spacing: 4) {
                 ForEach(sessionStore.orderedSessions) { session in
                     sessionPill(session)
+                        .onTapGesture(count: 2) {
+                            // Double-tap: open in cmux
+                            if let name = session.projectName {
+                                CmuxIntegration.focusWorkspace(for: name)
+                                CmuxIntegration.activateApp()
+                            }
+                        }
                         .onTapGesture {
                             sessionStore.selectedSessionId = session.id
                         }

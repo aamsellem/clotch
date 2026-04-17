@@ -72,6 +72,22 @@ struct ExpandedPanelView: View {
             }
 
             Spacer()
+
+            // Open in cmux button
+            if CmuxIntegration.isAvailable, session.projectName != nil {
+                Button(action: {
+                    if let name = session.projectName {
+                        CmuxIntegration.focusWorkspace(for: name)
+                        CmuxIntegration.activateApp()
+                    }
+                }) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 12))
+                        .foregroundStyle(TerminalColors.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open in cmux")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
