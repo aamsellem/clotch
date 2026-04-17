@@ -50,7 +50,8 @@
       "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Clotch-*)",
       "Bash(git config *)",
       "Read(//Users/aamsellem/**)",
-      "Bash(gh repo *)"
+      "Bash(gh repo *)",
+      "Bash(gh auth *)"
     ]
   }
 }
