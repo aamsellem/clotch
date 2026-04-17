@@ -58,7 +58,8 @@
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux list-workspaces *)",
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux find-window *)",
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux /Users/aamsellem/dev/clotch)",
-      "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux workspace-action *)"
+      "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux workspace-action *)",
+      "Bash(echo \"---exit: $?\")"
     ]
   }
 }
