@@ -74,11 +74,9 @@ struct ExpandedPanelView: View {
             Spacer()
 
             // Open in cmux button
-            if CmuxIntegration.isAvailable, session.cwd != nil {
+            if CmuxIntegration.isAvailable {
                 Button(action: {
-                    if let cwd = session.cwd {
-                        CmuxIntegration.open(path: cwd)
-                    }
+                    CmuxIntegration.focusSession(projectName: session.projectName, cwd: session.cwd)
                 }) {
                     Image(systemName: "terminal")
                         .font(.system(size: 12))

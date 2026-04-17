@@ -10,10 +10,7 @@ struct SessionListView: View {
                 ForEach(sessionStore.orderedSessions) { session in
                     sessionPill(session)
                         .onTapGesture(count: 2) {
-                            // Double-tap: open in cmux
-                            if let cwd = session.cwd {
-                                CmuxIntegration.open(path: cwd)
-                            }
+                            CmuxIntegration.focusSession(projectName: session.projectName, cwd: session.cwd)
                         }
                         .onTapGesture {
                             sessionStore.selectedSessionId = session.id
