@@ -39,9 +39,12 @@ final class ClotchStateMachine {
     func handleEvent(_ event: HookEvent) {
         let session = sessionStore.getOrCreate(id: event.sessionId)
 
-        // Extract project name from cwd (last path component)
-        if session.projectName == nil, let cwd = event.cwd {
-            session.projectName = (cwd as NSString).lastPathComponent
+        // Extract project name and cwd
+        if let cwd = event.cwd {
+            if session.cwd == nil { session.cwd = cwd }
+            if session.projectName == nil {
+                session.projectName = (cwd as NSString).lastPathComponent
+            }
         }
 
         switch event.event {

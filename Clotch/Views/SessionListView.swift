@@ -11,9 +11,8 @@ struct SessionListView: View {
                     sessionPill(session)
                         .onTapGesture(count: 2) {
                             // Double-tap: open in cmux
-                            if let name = session.projectName {
-                                CmuxIntegration.focusWorkspace(for: name)
-                                CmuxIntegration.activateApp()
+                            if let cwd = session.cwd {
+                                CmuxIntegration.open(path: cwd)
                             }
                         }
                         .onTapGesture {

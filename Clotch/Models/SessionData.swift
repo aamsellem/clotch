@@ -10,8 +10,10 @@ final class SessionData: Identifiable {
     var task: ClotchTask = .idle
     /// Emotion state (on-device sentiment)
     let emotion = EmotionState()
-    /// Working directory name (extracted from cwd in hook events)
+    /// Working directory name (last path component of cwd)
     var projectName: String?
+    /// Full working directory path
+    var cwd: String?
     /// The last user prompt text
     var lastPrompt: String?
     /// Current working tool name
