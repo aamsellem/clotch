@@ -12,7 +12,7 @@ struct SessionRowView: View {
                 .frame(width: 6, height: 6)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(String(session.id.prefix(8)))
+                Text(session.projectName ?? String(session.id.prefix(8)))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(isSelected ? TerminalColors.text : TerminalColors.textSecondary)
 

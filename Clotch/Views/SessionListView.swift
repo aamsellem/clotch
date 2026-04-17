@@ -25,7 +25,7 @@ struct SessionListView: View {
                 .fill(isSelected ? TerminalColors.green : TerminalColors.textTertiary)
                 .frame(width: 5, height: 5)
 
-            Text(String(session.id.prefix(6)))
+            Text(session.projectName ?? String(session.id.prefix(6)))
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(isSelected ? TerminalColors.text : TerminalColors.textSecondary)
         }
