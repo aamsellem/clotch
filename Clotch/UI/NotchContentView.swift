@@ -86,15 +86,29 @@ struct NotchContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
+    /// Whether a card is currently visible in the active session
+    private var activeCardShown: Bool {
+        guard let s = sessionStore.activeSession, !panelManager.isExpanded else { return false }
+        if s.task == .waiting { return true }
+        if let until = s.showCompletionUntil, until > Date() { return true }
+        return false
+    }
+
     @ViewBuilder
     private var notchContent: some View {
         ZStack(alignment: .top) {
-            // Background
+            // Background — clickable to toggle expand UNLESS a card is visible (so the
+            // card's buttons own their clicks).
             Color(red: 0.05, green: 0.05, blue: 0.07)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !activeCardShown {
+                        panelManager.isExpanded.toggle()
+                    }
+                }
 
             VStack(spacing: 0) {
-                // Header row (always visible, matches notch height).
-                // Tap-to-toggle only lives here so it doesn't eat clicks on cards/buttons.
+                // Header row (always visible, matches notch height)
                 headerRow
                     .frame(height: notchHeight)
                     .contentShape(Rectangle())

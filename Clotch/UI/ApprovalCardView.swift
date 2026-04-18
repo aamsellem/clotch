@@ -94,8 +94,12 @@ struct ApprovalCardView: View {
     }
 
     private func pick(_ choice: CardChoice) {
-        // Send literal key + Enter via send-panel (handles digits/letters natively)
-        CmuxIntegration.sendText(projectName: session.projectName, text: "\(choice.key)\n")
+        // Send literal key via send-panel, then Enter via send-key.
+        // cmux send-panel escape \n is the literal backslash-n string, not a newline.
+        CmuxIntegration.sendText(projectName: session.projectName, text: choice.key)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            CmuxIntegration.sendKey(projectName: session.projectName, key: "enter")
+        }
         session.task = .working
         onDismiss()
     }

@@ -144,11 +144,17 @@ enum CmuxIntegration {
     /// Answer a yes/no permission prompt by sending the key + Enter.
     static func answerPermission(projectName: String?, allow: Bool) {
         let char = allow ? "y" : "n"
-        sendText(projectName: projectName, text: "\(char)\n")
+        sendText(projectName: projectName, text: char)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            sendKey(projectName: projectName, key: "enter")
+        }
     }
 
     /// Answer a numbered question (1/2/3) by sending the digit + Enter.
     static func answerQuestion(projectName: String?, option: Int) {
-        sendText(projectName: projectName, text: "\(option)\n")
+        sendText(projectName: projectName, text: String(option))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            sendKey(projectName: projectName, key: "enter")
+        }
     }
 }
