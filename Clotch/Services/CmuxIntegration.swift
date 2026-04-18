@@ -1,6 +1,10 @@
 import AppKit
 
-/// Integration with cmux terminal — focuses workspaces and sends keystrokes to panes.
+/// Integration with cmux terminal — focuses workspaces and injects keystrokes.
+///
+/// When Claude Code runs inside cmux, cmux injects `CMUX_PANEL_ID` and
+/// `CMUX_WORKSPACE_ID` into the environment. Our hook script captures these
+/// and sends them in the payload, so we have the exact target surface.
 enum CmuxIntegration {
     private static let cmuxPath = "/Applications/cmux.app/Contents/Resources/bin/cmux"
 
@@ -8,153 +12,145 @@ enum CmuxIntegration {
         FileManager.default.fileExists(atPath: cmuxPath)
     }
 
-    /// A resolved cmux location for a session
-    struct SurfaceLocation {
-        let workspace: String
-        let surface: String
-    }
-
-    /// Synchronously find the cmux workspace + focused terminal surface for a project name.
-    /// Returns nil if nothing matches.
-    static func findSurface(projectName: String) -> SurfaceLocation? {
-        guard isAvailable, !projectName.isEmpty else { return nil }
-
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: cmuxPath)
-        p.arguments = ["tree", "--all", "--json"]
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = FileHandle.nullDevice
-
-        do {
-            try p.run()
-            p.waitUntilExit()
-            guard p.terminationStatus == 0 else { return nil }
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-
-            let target = projectName.lowercased()
-            let windows = json["windows"] as? [[String: Any]] ?? []
-            for window in windows {
-                let workspaces = window["workspaces"] as? [[String: Any]] ?? []
-                for ws in workspaces {
-                    let title = (ws["title"] as? String ?? "").lowercased()
-                    guard title.contains(target) else { continue }
-                    guard let wsRef = ws["ref"] as? String else { continue }
-
-                    // Pick focused pane, then selected terminal surface within it
-                    let panes = ws["panes"] as? [[String: Any]] ?? []
-                    let focusedPane = panes.first { ($0["focused"] as? Bool) == true } ?? panes.first
-                    guard let pane = focusedPane else { continue }
-
-                    let surfaces = pane["surfaces"] as? [[String: Any]] ?? []
-                    // Prefer selected terminal; fallback to first terminal; else any selected
-                    let terminals = surfaces.filter { ($0["type"] as? String) == "terminal" }
-                    let picked = terminals.first(where: { ($0["selected"] as? Bool) == true })
-                        ?? terminals.first
-                        ?? surfaces.first(where: { ($0["selected"] as? Bool) == true })
-                        ?? surfaces.first
-                    guard let surface = picked, let sRef = surface["ref"] as? String else { continue }
-
-                    return SurfaceLocation(workspace: wsRef, surface: sRef)
-                }
-            }
-        } catch {
-            return nil
+    /// Resolve the target panel + workspace for a session.
+    /// Prefers the cmux UUIDs captured from env vars; falls back to parsing tree by projectName.
+    static func resolveTarget(session: SessionData) -> (panel: String, workspace: String)? {
+        if let pid = session.cmuxPanelId, let wid = session.cmuxWorkspaceId {
+            return (panel: pid, workspace: wid)
+        }
+        if let name = session.projectName, let tree = findByTreeLookup(projectName: name) {
+            return (panel: tree.surface, workspace: tree.workspace)
         }
         return nil
     }
 
-    /// Focus the cmux workspace for a project name and bring cmux to the foreground.
-    static func focusSession(projectName: String?, cwd: String?) {
+    /// Send literal text to the session's cmux surface.
+    static func sendText(session: SessionData, text: String) {
+        guard isAvailable, let target = resolveTarget(session: session) else {
+            print("[Clotch] cmux: no target for session \(session.id)")
+            return
+        }
+        runCmux(["send-panel", "--panel", target.panel, "--workspace", target.workspace, text])
+    }
+
+    /// Send a symbolic key (enter, tab, ctrl+c…) to the session's cmux surface.
+    static func sendKey(session: SessionData, key: String) {
+        guard isAvailable, let target = resolveTarget(session: session) else { return }
+        runCmux(["send-key", "--workspace", target.workspace, "--surface", target.panel, key])
+    }
+
+    /// Answer a permission prompt: types the char then presses Enter.
+    static func answerPermission(session: SessionData, allow: Bool) {
+        sendText(session: session, text: allow ? "y" : "n")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            sendKey(session: session, key: "enter")
+        }
+    }
+
+    /// Answer a numbered question (1/2/3).
+    static func answerQuestion(session: SessionData, option: Int) {
+        sendText(session: session, text: String(option))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            sendKey(session: session, key: "enter")
+        }
+    }
+
+    /// Focus the session's cmux workspace and bring the app forward.
+    static func focusSession(session: SessionData) {
         guard isAvailable else { return }
-        let query = projectName ?? (cwd as? NSString)?.lastPathComponent ?? ""
-        guard !query.isEmpty else { return }
-
         DispatchQueue.global(qos: .userInitiated).async {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: cmuxPath)
-            p.arguments = ["find-window", "--select", query]
-            p.standardOutput = FileHandle.nullDevice
-            p.standardError = FileHandle.nullDevice
-            try? p.run()
-            p.waitUntilExit()
-
+            if let wid = session.cmuxWorkspaceId {
+                runCmuxSync(["select-workspace", "--workspace", wid])
+            } else if let name = session.projectName, !name.isEmpty {
+                runCmuxSync(["find-window", "--select", name])
+            }
             DispatchQueue.main.async {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/cmux.app"))
             }
         }
     }
 
-    /// Send literal text (ending in \n for Enter) to the surface matching projectName.
-    /// Uses `cmux send-panel` which supports arbitrary characters.
-    static func sendText(projectName: String?, text: String) {
-        guard isAvailable, let name = projectName, !name.isEmpty else { return }
+    // MARK: - Legacy entry points (projectName-only)
 
+    static func focusSession(projectName: String?, cwd: String?) {
+        guard isAvailable else { return }
+        let query = projectName ?? (cwd as? NSString)?.lastPathComponent ?? ""
+        guard !query.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let loc = findSurface(projectName: name) else {
-                print("[Clotch] cmux: no surface found for \(name)")
-                return
-            }
-
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: cmuxPath)
-            p.arguments = [
-                "send-panel",
-                "--panel", loc.surface,
-                "--workspace", loc.workspace,
-                text
-            ]
-            let pipe = Pipe()
-            p.standardOutput = pipe
-            p.standardError = pipe
-            try? p.run()
-            p.waitUntilExit()
-            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            if p.terminationStatus != 0 {
-                print("[Clotch] cmux send-panel failed: \(output)")
+            runCmuxSync(["find-window", "--select", query])
+            DispatchQueue.main.async {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/cmux.app"))
             }
         }
     }
 
-    /// Send a single symbolic key (enter, return, ctrl+c, tab...) — NOT literals.
-    /// Use sendText for letters/digits.
     static func sendKey(projectName: String?, key: String) {
-        guard isAvailable, let name = projectName, !name.isEmpty else { return }
+        guard let name = projectName, let t = findByTreeLookup(projectName: name) else { return }
+        runCmux(["send-key", "--workspace", t.workspace, "--surface", t.surface, key])
+    }
 
+    static func sendText(projectName: String?, text: String) {
+        guard let name = projectName, let t = findByTreeLookup(projectName: name) else { return }
+        runCmux(["send-panel", "--panel", t.surface, "--workspace", t.workspace, text])
+    }
+
+    // MARK: - Process helpers
+
+    private static func runCmux(_ args: [String]) {
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let loc = findSurface(projectName: name) else { return }
+            runCmuxSync(args)
+        }
+    }
 
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: cmuxPath)
-            p.arguments = [
-                "send-key",
-                "--workspace", loc.workspace,
-                "--surface", loc.surface,
-                key
-            ]
-            p.standardOutput = FileHandle.nullDevice
-            p.standardError = FileHandle.nullDevice
-            try? p.run()
+    @discardableResult
+    private static func runCmuxSync(_ args: [String]) -> String {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: cmuxPath)
+        p.arguments = args
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe
+        do {
+            try p.run()
             p.waitUntilExit()
+            let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if p.terminationStatus != 0 {
+                print("[Clotch] cmux \(args.joined(separator: " ")) failed: \(out)")
+            }
+            return out
+        } catch {
+            print("[Clotch] cmux launch error: \(error)")
+            return ""
         }
     }
 
-    /// Answer a yes/no permission prompt by sending the key + Enter.
-    static func answerPermission(projectName: String?, allow: Bool) {
-        let char = allow ? "y" : "n"
-        sendText(projectName: projectName, text: char)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            sendKey(projectName: projectName, key: "enter")
-        }
-    }
+    // MARK: - Tree parsing (fallback when env vars are missing)
 
-    /// Answer a numbered question (1/2/3) by sending the digit + Enter.
-    static func answerQuestion(projectName: String?, option: Int) {
-        sendText(projectName: projectName, text: String(option))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            sendKey(projectName: projectName, key: "enter")
+    private static func findByTreeLookup(projectName: String) -> (surface: String, workspace: String)? {
+        let json = runCmuxSync(["tree", "--all", "--json"])
+        guard !json.isEmpty, let data = json.data(using: .utf8) else { return nil }
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+        let target = projectName.lowercased()
+        let windows = root["windows"] as? [[String: Any]] ?? []
+        for window in windows {
+            let workspaces = window["workspaces"] as? [[String: Any]] ?? []
+            for ws in workspaces {
+                let title = (ws["title"] as? String ?? "").lowercased()
+                guard title.contains(target), let wsRef = ws["ref"] as? String else { continue }
+                let panes = ws["panes"] as? [[String: Any]] ?? []
+                let focused = panes.first { ($0["focused"] as? Bool) == true } ?? panes.first
+                guard let pane = focused else { continue }
+                let surfaces = pane["surfaces"] as? [[String: Any]] ?? []
+                let terminals = surfaces.filter { ($0["type"] as? String) == "terminal" }
+                let picked = terminals.first(where: { ($0["selected"] as? Bool) == true })
+                    ?? terminals.first
+                    ?? surfaces.first
+                if let s = picked, let sRef = s["ref"] as? String {
+                    return (surface: sRef, workspace: wsRef)
+                }
+            }
         }
+        return nil
     }
 }

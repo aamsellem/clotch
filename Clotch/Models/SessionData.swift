@@ -14,6 +14,10 @@ final class SessionData: Identifiable {
     var projectName: String?
     /// Full working directory path
     var cwd: String?
+    /// cmux panel UUID (from CMUX_PANEL_ID env var in the hook)
+    var cmuxPanelId: String?
+    /// cmux workspace UUID (from CMUX_WORKSPACE_ID env var)
+    var cmuxWorkspaceId: String?
     /// The last user prompt text
     var lastPrompt: String?
     /// Current working tool name

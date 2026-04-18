@@ -67,7 +67,8 @@
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux send-key *)",
       "Bash(echo \"exit=$?\")",
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux send-panel *)",
-      "Bash(gh search *)"
+      "Bash(gh search *)",
+      "Bash(env)"
     ],
     "defaultMode": "auto"
   }

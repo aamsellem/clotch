@@ -39,12 +39,19 @@ final class ClotchStateMachine {
     func handleEvent(_ event: HookEvent) {
         let session = sessionStore.getOrCreate(id: event.sessionId)
 
-        // Extract project name and cwd
+        // Extract project name, cwd, and cmux identifiers
         if let cwd = event.cwd {
             if session.cwd == nil { session.cwd = cwd }
             if session.projectName == nil {
                 session.projectName = (cwd as NSString).lastPathComponent
             }
+        }
+        // Always refresh cmux IDs — they can change if the panel is moved
+        if let pid = event.cmuxPanelId, !pid.isEmpty {
+            session.cmuxPanelId = pid
+        }
+        if let wid = event.cmuxWorkspaceId, !wid.isEmpty {
+            session.cmuxWorkspaceId = wid
         }
 
         switch event.event {

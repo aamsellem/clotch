@@ -8,6 +8,8 @@ struct HookEvent: Decodable {
     let toolInput: String?
     let userPrompt: String?
     let cwd: String?
+    let cmuxPanelId: String?
+    let cmuxWorkspaceId: String?
     let timestamp: Date
 
     enum EventType: String, Decodable {
@@ -33,6 +35,8 @@ struct HookEvent: Decodable {
         case toolInput = "tool_input"
         case userPrompt = "user_prompt"
         case cwd
+        case cmuxPanelId = "cmux_panel_id"
+        case cmuxWorkspaceId = "cmux_workspace_id"
         case timestamp
     }
 
@@ -44,6 +48,8 @@ struct HookEvent: Decodable {
         toolInput = try container.decodeIfPresent(String.self, forKey: .toolInput)
         userPrompt = try container.decodeIfPresent(String.self, forKey: .userPrompt)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
+        cmuxPanelId = try container.decodeIfPresent(String.self, forKey: .cmuxPanelId)
+        cmuxWorkspaceId = try container.decodeIfPresent(String.self, forKey: .cmuxWorkspaceId)
 
         if let ts = try? container.decodeIfPresent(Double.self, forKey: .timestamp) {
             timestamp = Date(timeIntervalSince1970: ts)
@@ -54,13 +60,15 @@ struct HookEvent: Decodable {
         }
     }
 
-    init(sessionId: String, event: EventType, tool: String? = nil, toolInput: String? = nil, userPrompt: String? = nil, cwd: String? = nil) {
+    init(sessionId: String, event: EventType, tool: String? = nil, toolInput: String? = nil, userPrompt: String? = nil, cwd: String? = nil, cmuxPanelId: String? = nil, cmuxWorkspaceId: String? = nil) {
         self.sessionId = sessionId
         self.event = event
         self.tool = tool
         self.toolInput = toolInput
         self.userPrompt = userPrompt
         self.cwd = cwd
+        self.cmuxPanelId = cmuxPanelId
+        self.cmuxWorkspaceId = cmuxWorkspaceId
         self.timestamp = Date()
     }
 }

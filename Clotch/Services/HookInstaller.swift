@@ -169,6 +169,8 @@ final class HookInstaller {
         'tool_input': None,
         'user_prompt': data.get('user_prompt', data.get('prompt', None)),
         'cwd': data.get('cwd', None),
+        'cmux_panel_id': os.environ.get('CMUX_PANEL_ID'),
+        'cmux_workspace_id': os.environ.get('CMUX_WORKSPACE_ID'),
         'timestamp': int(time.time())
     }
     ti = data.get('tool_input')

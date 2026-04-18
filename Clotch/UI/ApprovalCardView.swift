@@ -94,11 +94,11 @@ struct ApprovalCardView: View {
     }
 
     private func pick(_ choice: CardChoice) {
-        // Send literal key via send-panel, then Enter via send-key.
-        // cmux send-panel escape \n is the literal backslash-n string, not a newline.
-        CmuxIntegration.sendText(projectName: session.projectName, text: choice.key)
+        let pid = session.cmuxPanelId ?? "?"
+        NSLog("[Clotch] ApprovalCard.pick key=\(choice.key) panel=\(pid)")
+        CmuxIntegration.sendText(session: session, text: choice.key)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            CmuxIntegration.sendKey(projectName: session.projectName, key: "enter")
+            CmuxIntegration.sendKey(session: session, key: "enter")
         }
         session.task = .working
         onDismiss()
