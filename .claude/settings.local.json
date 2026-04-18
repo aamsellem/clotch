@@ -61,7 +61,9 @@
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux workspace-action *)",
       "Bash(echo \"---exit: $?\")",
       "Skill(update-config)",
-      "WebFetch(domain:vibeisland.app)"
+      "WebFetch(domain:vibeisland.app)",
+      "Bash(rm -rf /private/tmp/claude-502/*/tasks)",
+      "Bash(rm -f /tmp/clotch-*.png /tmp/*.log)"
     ],
     "defaultMode": "auto"
   }

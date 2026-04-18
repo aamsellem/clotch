@@ -44,6 +44,12 @@ final class NotchPanelManager {
     static let windowHeight: CGFloat = 500
     static let expandedPanelSize = CGSize(width: 450, height: 450)
 
+    /// Activate the panel so buttons inside receive clicks.
+    /// Needed for non-activating panels when showing interactive cards.
+    func activateForInteraction() {
+        panel?.makeKeyAndOrderFront(nil)
+    }
+
     init(sessionStore: SessionStore, stateMachine: ClotchStateMachine, usageService: UsageService, settings: AppSettings) {
         self.sessionStore = sessionStore
         self.stateMachine = stateMachine

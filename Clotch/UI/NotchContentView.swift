@@ -102,6 +102,7 @@ struct NotchContentView: View {
                     if session.task == .waiting {
                         ApprovalCardView(session: session)
                             .transition(.opacity.combined(with: .move(edge: .top)))
+                            .onAppear { panelManager.activateForInteraction() }
                     } else if let until = session.showCompletionUntil, until > Date() {
                         CompletionCardView(
                             session: session,
@@ -111,6 +112,7 @@ struct NotchContentView: View {
                             onDismiss: { session.showCompletionUntil = nil }
                         )
                         .transition(.opacity.combined(with: .move(edge: .top)))
+                        .onAppear { panelManager.activateForInteraction() }
                     }
                 }
 
