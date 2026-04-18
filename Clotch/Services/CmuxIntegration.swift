@@ -87,8 +87,39 @@ enum CmuxIntegration {
         }
     }
 
-    /// Send a single key (e.g. "y", "n", "1", "Return") to the cmux surface matching projectName.
-    /// The key is passed to `cmux send-key` which understands symbolic names.
+    /// Send literal text (ending in \n for Enter) to the surface matching projectName.
+    /// Uses `cmux send-panel` which supports arbitrary characters.
+    static func sendText(projectName: String?, text: String) {
+        guard isAvailable, let name = projectName, !name.isEmpty else { return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let loc = findSurface(projectName: name) else {
+                print("[Clotch] cmux: no surface found for \(name)")
+                return
+            }
+
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: cmuxPath)
+            p.arguments = [
+                "send-panel",
+                "--panel", loc.surface,
+                "--workspace", loc.workspace,
+                text
+            ]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = pipe
+            try? p.run()
+            p.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if p.terminationStatus != 0 {
+                print("[Clotch] cmux send-panel failed: \(output)")
+            }
+        }
+    }
+
+    /// Send a single symbolic key (enter, return, ctrl+c, tab...) — NOT literals.
+    /// Use sendText for letters/digits.
     static func sendKey(projectName: String?, key: String) {
         guard isAvailable, let name = projectName, !name.isEmpty else { return }
 
@@ -110,21 +141,14 @@ enum CmuxIntegration {
         }
     }
 
-    /// Answer a yes/no permission prompt by sending the corresponding key + Return.
+    /// Answer a yes/no permission prompt by sending the key + Enter.
     static func answerPermission(projectName: String?, allow: Bool) {
-        let key = allow ? "y" : "n"
-        sendKey(projectName: projectName, key: key)
-        // Small delay then Return to submit
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            sendKey(projectName: projectName, key: "Return")
-        }
+        let char = allow ? "y" : "n"
+        sendText(projectName: projectName, text: "\(char)\n")
     }
 
-    /// Answer a numbered question (1/2/3) by sending the digit + Return.
+    /// Answer a numbered question (1/2/3) by sending the digit + Enter.
     static func answerQuestion(projectName: String?, option: Int) {
-        sendKey(projectName: projectName, key: String(option))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            sendKey(projectName: projectName, key: "Return")
-        }
+        sendText(projectName: projectName, text: "\(option)\n")
     }
 }

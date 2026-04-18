@@ -63,7 +63,10 @@
       "Skill(update-config)",
       "WebFetch(domain:vibeisland.app)",
       "Bash(rm -rf /private/tmp/claude-502/*/tasks)",
-      "Bash(rm -f /tmp/clotch-*.png /tmp/*.log)"
+      "Bash(rm -f /tmp/clotch-*.png /tmp/*.log)",
+      "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux send-key *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux send-panel *)"
     ],
     "defaultMode": "auto"
   }

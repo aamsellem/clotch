@@ -94,10 +94,8 @@ struct ApprovalCardView: View {
     }
 
     private func pick(_ choice: CardChoice) {
-        CmuxIntegration.sendKey(projectName: session.projectName, key: choice.key)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            CmuxIntegration.sendKey(projectName: session.projectName, key: "Return")
-        }
+        // Send literal key + Enter via send-panel (handles digits/letters natively)
+        CmuxIntegration.sendText(projectName: session.projectName, text: "\(choice.key)\n")
         session.task = .working
         onDismiss()
     }
