@@ -26,10 +26,12 @@ enum CmuxIntegration {
 
     /// Send literal text to the session's cmux surface.
     static func sendText(session: SessionData, text: String) {
+        NSLog("[Clotch] CmuxIntegration.sendText text=\(text) sessionPanel=\(session.cmuxPanelId ?? "nil") project=\(session.projectName ?? "nil")")
         guard isAvailable, let target = resolveTarget(session: session) else {
-            print("[Clotch] cmux: no target for session \(session.id)")
+            NSLog("[Clotch] cmux: no target for session \(session.id)")
             return
         }
+        NSLog("[Clotch] cmux send-panel target panel=\(target.panel) ws=\(target.workspace)")
         runCmux(["send-panel", "--panel", target.panel, "--workspace", target.workspace, text])
     }
 

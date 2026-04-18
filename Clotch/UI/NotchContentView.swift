@@ -22,6 +22,8 @@ struct NotchContentView: View {
     let settings: AppSettings
 
     @State private var isHovering = false
+    @State private var hoverExpandTask: DispatchWorkItem?
+    @State private var hoverCollapseTask: DispatchWorkItem?
 
     private let notchWidth: CGFloat = 220
     private var notchHeight: CGFloat { panelManager.notchSize.height }
@@ -148,9 +150,39 @@ struct NotchContentView: View {
             }
         }
         .onHover { hovering in
-            if !panelManager.isExpanded {
-                isHovering = hovering
+            handleHover(hovering)
+        }
+    }
+
+    private func handleHover(_ hovering: Bool) {
+        if !panelManager.isExpanded {
+            isHovering = hovering
+        }
+        // Activate the panel while hovering so SwiftUI taps/TextFields receive events
+        if hovering {
+            panelManager.activateForInteraction()
+        }
+        if hovering {
+            hoverCollapseTask?.cancel()
+            guard !panelManager.isExpanded, !activeCardShown else { return }
+            let task = DispatchWorkItem {
+                if !panelManager.isExpanded {
+                    panelManager.isExpanded = true
+                    panelManager.activateForInteraction()
+                }
             }
+            hoverExpandTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: task)
+        } else {
+            hoverExpandTask?.cancel()
+            guard panelManager.isExpanded else { return }
+            let task = DispatchWorkItem {
+                if panelManager.isExpanded {
+                    panelManager.isExpanded = false
+                }
+            }
+            hoverCollapseTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: task)
         }
     }
 

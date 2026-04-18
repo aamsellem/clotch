@@ -9,6 +9,8 @@ struct ExpandedPanelView: View {
     let settings: AppSettings
 
     @State private var showSettings = false
+    @State private var commandText = ""
+    @FocusState private var commandFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +40,11 @@ struct ExpandedPanelView: View {
 
             Divider()
                 .background(TerminalColors.border)
+
+            // Command input — send arbitrary text to the cmux surface of the active session
+            if sessionStore.activeSession != nil && CmuxIntegration.isAvailable {
+                commandInput
+            }
 
             // Usage bar
             if usageService.quota.isAvailable {
@@ -110,6 +117,42 @@ struct ExpandedPanelView: View {
                 .padding(.vertical, 4)
             }
         }
+    }
+
+    private var commandInput: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(TerminalColors.textTertiary)
+            TextField("send to Claude…", text: $commandText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(TerminalColors.text)
+                .focused($commandFocused)
+                .onSubmit { sendCommand() }
+            if !commandText.isEmpty {
+                Button(action: sendCommand) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(TerminalColors.green)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(TerminalColors.background.opacity(0.4))
+    }
+
+    private func sendCommand() {
+        guard let session = sessionStore.activeSession else { return }
+        let trimmed = commandText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        CmuxIntegration.sendText(session: session, text: trimmed)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            CmuxIntegration.sendKey(session: session, key: "enter")
+        }
+        commandText = ""
     }
 
     private var bottomBar: some View {

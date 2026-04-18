@@ -68,7 +68,9 @@
       "Bash(echo \"exit=$?\")",
       "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux send-panel *)",
       "Bash(gh search *)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(rm -f /tmp/clotch.sock xcodegen generate)",
+      "Bash(/usr/bin/log show *)"
     ],
     "defaultMode": "auto"
   }

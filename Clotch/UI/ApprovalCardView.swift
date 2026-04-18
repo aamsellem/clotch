@@ -86,8 +86,6 @@ struct ApprovalCardView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .onTapGesture { /* consume — prevent parent toggle */ }
         .background(
             KeyboardShortcuts(choices: choices, onPick: pick)
         )
@@ -131,6 +129,7 @@ private struct ChoiceButton: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture {
+            NSLog("[Clotch] ChoiceButton tap: \(choice.label)")
             action()
         }
     }
