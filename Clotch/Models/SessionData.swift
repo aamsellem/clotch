@@ -24,6 +24,8 @@ final class SessionData: Identifiable {
     var spriteX: Double = 0.5
     /// Timer for transitioning to sleep after inactivity
     var sleepTimer: Timer?
+    /// Date until which the completion card should be shown (nil = not shown)
+    var showCompletionUntil: Date?
     /// Path to the conversation JSONL transcript file
     var transcriptPath: String?
     /// Last known file offset for incremental transcript parsing

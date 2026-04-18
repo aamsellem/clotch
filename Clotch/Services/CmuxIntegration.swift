@@ -1,6 +1,6 @@
 import AppKit
 
-/// Integration with cmux terminal — focuses the workspace for a session.
+/// Integration with cmux terminal — focuses workspaces and sends keystrokes to panes.
 enum CmuxIntegration {
     private static let cmuxPath = "/Applications/cmux.app/Contents/Resources/bin/cmux"
 
@@ -8,14 +8,71 @@ enum CmuxIntegration {
         FileManager.default.fileExists(atPath: cmuxPath)
     }
 
-    /// Focus the cmux workspace matching a project name, then bring cmux to front.
+    /// A resolved cmux location for a session
+    struct SurfaceLocation {
+        let workspace: String
+        let surface: String
+    }
+
+    /// Synchronously find the cmux workspace + focused terminal surface for a project name.
+    /// Returns nil if nothing matches.
+    static func findSurface(projectName: String) -> SurfaceLocation? {
+        guard isAvailable, !projectName.isEmpty else { return nil }
+
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: cmuxPath)
+        p.arguments = ["tree", "--all", "--json"]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = FileHandle.nullDevice
+
+        do {
+            try p.run()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { return nil }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+            let target = projectName.lowercased()
+            let windows = json["windows"] as? [[String: Any]] ?? []
+            for window in windows {
+                let workspaces = window["workspaces"] as? [[String: Any]] ?? []
+                for ws in workspaces {
+                    let title = (ws["title"] as? String ?? "").lowercased()
+                    guard title.contains(target) else { continue }
+                    guard let wsRef = ws["ref"] as? String else { continue }
+
+                    // Pick focused pane, then selected terminal surface within it
+                    let panes = ws["panes"] as? [[String: Any]] ?? []
+                    let focusedPane = panes.first { ($0["focused"] as? Bool) == true } ?? panes.first
+                    guard let pane = focusedPane else { continue }
+
+                    let surfaces = pane["surfaces"] as? [[String: Any]] ?? []
+                    // Prefer selected terminal; fallback to first terminal; else any selected
+                    let terminals = surfaces.filter { ($0["type"] as? String) == "terminal" }
+                    let picked = terminals.first(where: { ($0["selected"] as? Bool) == true })
+                        ?? terminals.first
+                        ?? surfaces.first(where: { ($0["selected"] as? Bool) == true })
+                        ?? surfaces.first
+                    guard let surface = picked, let sRef = surface["ref"] as? String else { continue }
+
+                    return SurfaceLocation(workspace: wsRef, surface: sRef)
+                }
+            }
+        } catch {
+            return nil
+        }
+        return nil
+    }
+
+    /// Focus the cmux workspace for a project name and bring cmux to the foreground.
     static func focusSession(projectName: String?, cwd: String?) {
         guard isAvailable else { return }
         let query = projectName ?? (cwd as? NSString)?.lastPathComponent ?? ""
         guard !query.isEmpty else { return }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            // find-window --select finds and selects the matching workspace
             let p = Process()
             p.executableURL = URL(fileURLWithPath: cmuxPath)
             p.arguments = ["find-window", "--select", query]
@@ -24,10 +81,50 @@ enum CmuxIntegration {
             try? p.run()
             p.waitUntilExit()
 
-            // Bring cmux to front on main thread
             DispatchQueue.main.async {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/cmux.app"))
             }
+        }
+    }
+
+    /// Send a single key (e.g. "y", "n", "1", "Return") to the cmux surface matching projectName.
+    /// The key is passed to `cmux send-key` which understands symbolic names.
+    static func sendKey(projectName: String?, key: String) {
+        guard isAvailable, let name = projectName, !name.isEmpty else { return }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let loc = findSurface(projectName: name) else { return }
+
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: cmuxPath)
+            p.arguments = [
+                "send-key",
+                "--workspace", loc.workspace,
+                "--surface", loc.surface,
+                key
+            ]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            try? p.run()
+            p.waitUntilExit()
+        }
+    }
+
+    /// Answer a yes/no permission prompt by sending the corresponding key + Return.
+    static func answerPermission(projectName: String?, allow: Bool) {
+        let key = allow ? "y" : "n"
+        sendKey(projectName: projectName, key: key)
+        // Small delay then Return to submit
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            sendKey(projectName: projectName, key: "Return")
+        }
+    }
+
+    /// Answer a numbered question (1/2/3) by sending the digit + Return.
+    static func answerQuestion(projectName: String?, option: Int) {
+        sendKey(projectName: projectName, key: String(option))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            sendKey(projectName: projectName, key: "Return")
         }
     }
 }

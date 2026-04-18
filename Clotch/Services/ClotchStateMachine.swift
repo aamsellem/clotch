@@ -183,6 +183,16 @@ final class ClotchStateMachine {
 
         session.activities.append(ActivityItem(kind: .info, text: "Task completed"))
 
+        // Show completion card for 5 seconds in the notch
+        session.showCompletionUntil = Date().addingTimeInterval(5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) { [weak session] in
+            if let session = session,
+               let until = session.showCompletionUntil,
+               until <= Date() {
+                session.showCompletionUntil = nil
+            }
+        }
+
         // Play completion sound + macOS notification when terminal not focused
         soundService.playNotification(for: .stop)
         if !(terminalFocusDetector.isTerminalFocused) {

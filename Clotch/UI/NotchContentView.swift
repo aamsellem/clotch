@@ -29,16 +29,29 @@ struct NotchContentView: View {
     // Extra width when peeking (sprite extends to the right)
     private let peekExtension: CGFloat = 50
 
-    // Dynamic size: collapsed = notch size, expanded = larger panel, peek = wider
+    /// Whether a card (approval/completion) is currently shown — grows the notch
+    private var showCard: Bool {
+        guard let session = sessionStore.activeSession, !panelManager.isExpanded else { return false }
+        if session.task == .waiting { return true }
+        if let until = session.showCompletionUntil, until > Date() { return true }
+        return false
+    }
+
+    // Dynamic size
     private var currentWidth: CGFloat {
         if panelManager.isExpanded { return NotchConstants.expandedSize.width }
+        if showCard { return 340 }
         let base = notchWidth + (isHovering ? 16 : 0)
         return shouldPeek ? base + peekExtension : base
     }
     private var currentHeight: CGFloat {
-        panelManager.isExpanded
-            ? NotchConstants.expandedSize.height
-            : notchHeight + (isHovering ? 6 : 0)
+        if panelManager.isExpanded { return NotchConstants.expandedSize.height }
+        if showCard {
+            // Approval card is taller (context + 2 buttons); completion is shorter
+            if sessionStore.activeSession?.task == .waiting { return notchHeight + 110 }
+            return notchHeight + 80
+        }
+        return notchHeight + (isHovering ? 6 : 0)
     }
 
     private var topRadius: CGFloat {
@@ -83,6 +96,23 @@ struct NotchContentView: View {
                 // Header row (always visible, matches notch height)
                 headerRow
                     .frame(height: notchHeight)
+
+                // Card surface (approval / completion) — shown without expanding the full panel
+                if let session = sessionStore.activeSession, !panelManager.isExpanded {
+                    if session.task == .waiting {
+                        ApprovalCardView(session: session)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    } else if let until = session.showCompletionUntil, until > Date() {
+                        CompletionCardView(
+                            session: session,
+                            onOpenTerminal: {
+                                CmuxIntegration.focusSession(projectName: session.projectName, cwd: session.cwd)
+                            },
+                            onDismiss: { session.showCompletionUntil = nil }
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
 
                 // Expanded content
                 if panelManager.isExpanded {
