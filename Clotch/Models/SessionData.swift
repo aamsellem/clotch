@@ -22,6 +22,10 @@ final class SessionData: Identifiable {
     var lastPrompt: String?
     /// Current working tool name
     var currentTool: String?
+    /// Short preview of the current tool's args (e.g. "rm file.txt", "/path/to/file.swift")
+    var currentToolPreview: String?
+    /// Full cwd-relative path affected by the current tool, when applicable
+    var currentToolPath: String?
     /// Recent activity events for the feed
     var activities: [ActivityItem] = []
     /// Sprite X position on the grass island (0..1 normalized)

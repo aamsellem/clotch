@@ -24,21 +24,35 @@ enum CmuxIntegration {
         return nil
     }
 
-    /// Send literal text to the session's cmux surface.
+    /// Send literal text to the session's cmux surface via JSON-RPC.
     static func sendText(session: SessionData, text: String) {
-        NSLog("[Clotch] CmuxIntegration.sendText text=\(text) sessionPanel=\(session.cmuxPanelId ?? "nil") project=\(session.projectName ?? "nil")")
-        guard isAvailable, let target = resolveTarget(session: session) else {
-            NSLog("[Clotch] cmux: no target for session \(session.id)")
+        NSLog("[Clotch] sendText text=%@ panel=%@ project=%@",
+              text, session.cmuxPanelId ?? "nil", session.projectName ?? "nil")
+        guard let surfaceId = resolveSurfaceId(session: session) else {
+            NSLog("[Clotch] cmux: no surface for session %@", session.id)
             return
         }
-        NSLog("[Clotch] cmux send-panel target panel=\(target.panel) ws=\(target.workspace)")
-        runCmux(["send-panel", "--panel", target.panel, "--workspace", target.workspace, text])
+        DispatchQueue.global(qos: .userInitiated).async {
+            CmuxSocketClient.call(method: "surface.send_text",
+                                  params: ["surface_id": surfaceId, "text": text])
+        }
     }
 
-    /// Send a symbolic key (enter, tab, ctrl+c…) to the session's cmux surface.
+    /// Send a symbolic key (enter, tab, ctrl+c…) via JSON-RPC.
     static func sendKey(session: SessionData, key: String) {
-        guard isAvailable, let target = resolveTarget(session: session) else { return }
-        runCmux(["send-key", "--workspace", target.workspace, "--surface", target.panel, key])
+        guard let surfaceId = resolveSurfaceId(session: session) else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            CmuxSocketClient.call(method: "surface.send_key",
+                                  params: ["surface_id": surfaceId, "key": key])
+        }
+    }
+
+    /// Resolve the surface UUID for a session — prefers cmuxPanelId from env vars.
+    private static func resolveSurfaceId(session: SessionData) -> String? {
+        if let pid = session.cmuxPanelId, !pid.isEmpty { return pid }
+        // Fallback: tree lookup would require CLI access which we don't have from a GUI app,
+        // so we can only send if the hook captured CMUX_PANEL_ID.
+        return nil
     }
 
     /// Answer a permission prompt: types the char then presses Enter.
@@ -109,6 +123,24 @@ enum CmuxIntegration {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: cmuxPath)
         p.arguments = args
+        // Inject CMUX_SOCKET_PATH if we can find it — the cmux CLI's auto-discovery
+        // sometimes fails when launched from a GUI process.
+        var env = ProcessInfo.processInfo.environment
+        if env["CMUX_SOCKET_PATH"] == nil {
+            for candidate in [
+                "/tmp/cmux-last-socket-path",
+                (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/cmux/last-socket-path")
+            ] {
+                if let path = try? String(contentsOfFile: candidate, encoding: .utf8)
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty,
+                   FileManager.default.fileExists(atPath: path) {
+                    env["CMUX_SOCKET_PATH"] = path
+                    break
+                }
+            }
+        }
+        p.environment = env
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = pipe
@@ -116,12 +148,13 @@ enum CmuxIntegration {
             try p.run()
             p.waitUntilExit()
             let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            if p.terminationStatus != 0 {
-                print("[Clotch] cmux \(args.joined(separator: " ")) failed: \(out)")
-            }
+            NSLog("[Clotch] cmux %@ exit=%d out=%@",
+                  args.joined(separator: " "),
+                  Int(p.terminationStatus),
+                  out.trimmingCharacters(in: .whitespacesAndNewlines))
             return out
         } catch {
-            print("[Clotch] cmux launch error: \(error)")
+            NSLog("[Clotch] cmux launch error: %@", error.localizedDescription)
             return ""
         }
     }

@@ -45,10 +45,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelManager.showPanel()
 
         // Start socket server
-        let socketServer = SocketServer(socketPath: "/tmp/clotch.sock") { [weak stateMachine] event in
-            stateMachine?.handleEvent(event)
-        }
+        let socketServer = SocketServer(
+            socketPath: "/tmp/clotch.sock",
+            handler: { [weak stateMachine] event in
+                stateMachine?.handleEvent(event)
+            },
+            permissionHandler: { [weak stateMachine] payload in
+                stateMachine?.handlePermissionRequest(payload)
+            }
+        )
         self.socketServer = socketServer
+        stateMachine.socketServer = socketServer
         socketServer.start()
 
         // Install hooks into Claude Code

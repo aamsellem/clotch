@@ -102,8 +102,8 @@ final class NotchPanelManager {
         )
 
         // Card area: 340 wide, starts at notch bottom and extends 150pt down
-        let cardWidth: CGFloat = 360
-        let cardHeight: CGFloat = 160
+        let cardWidth: CGFloat = 380
+        let cardHeight: CGFloat = 240
         cardRect = CGRect(
             x: notchCenterX - cardWidth / 2,
             y: screenFrame.maxY - notchSize.height - cardHeight,

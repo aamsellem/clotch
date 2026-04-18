@@ -15,24 +15,33 @@ struct CardChoice: Identifiable {
     }
 
     static func allow(key: String = "1") -> CardChoice {
-        CardChoice(label: "Allow", shortcut: "⌘Y", key: key, kind: .allow)
+        CardChoice(label: "Yes", shortcut: "⌘1", key: key, kind: .allow)
     }
-    static func deny(key: String = "2") -> CardChoice {
-        CardChoice(label: "Deny", shortcut: "⌘N", key: key, kind: .deny)
+    static func allowAlways(key: String = "2") -> CardChoice {
+        CardChoice(label: "Yes, and don't ask again", shortcut: "⌘2", key: key, kind: .allow)
+    }
+    static func deny(key: String = "3") -> CardChoice {
+        CardChoice(label: "No, tell Claude what to do differently", shortcut: "⌘3", key: key, kind: .deny)
     }
     static func numbered(_ n: Int, label: String) -> CardChoice {
         CardChoice(label: label, shortcut: "⌘\(n)", key: String(n), kind: .neutral)
     }
+
+    /// Standard 3-choice permission prompt that matches Claude Code's terminal prompt.
+    static let permissionDefaults: [CardChoice] = [.allow(), .allowAlways(), .deny()]
 }
 
 /// Generic choice card shown when Claude is waiting for user input.
 /// Sends the matching key to cmux via CmuxIntegration when an option is picked.
 struct ApprovalCardView: View {
     let session: SessionData
+    /// Called when the user picks a choice. Kind-based so the caller can translate
+    /// to the right action (resolve PermissionRequest, send keystroke, …).
+    var onPick: (CardChoice) -> Void = { _ in }
     var title: String = "Permission required"
     var icon: String = "questionmark.circle.fill"
     var iconColor: Color = .yellow
-    var choices: [CardChoice] = [.deny(), .allow()]
+    var choices: [CardChoice] = CardChoice.permissionDefaults
     var onDismiss: () -> Void = {}
 
     var body: some View {
@@ -53,19 +62,42 @@ struct ApprovalCardView: View {
                 }
             }
 
-            // Context (last tool use or prompt)
-            if let tool = session.currentTool {
-                Text(tool)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(.white.opacity(0.05))
-                    )
+            // Context: tool badge + preview of the args
+            VStack(alignment: .leading, spacing: 4) {
+                if let tool = session.currentTool {
+                    HStack(spacing: 6) {
+                        Text(tool)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color(red: 1.0, green: 0.55, blue: 0.2).opacity(0.85))
+                            )
+                        if let path = session.currentToolPath {
+                            Text(shortenPath(path))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.55))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                    }
+                }
+                if let preview = session.currentToolPreview, !preview.isEmpty {
+                    Text(preview)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(.white.opacity(0.06))
+                        )
+                }
             }
 
             // Choices — laid out horizontally for 2 options, vertically for 3+
@@ -92,14 +124,18 @@ struct ApprovalCardView: View {
     }
 
     private func pick(_ choice: CardChoice) {
-        let pid = session.cmuxPanelId ?? "?"
-        NSLog("[Clotch] ApprovalCard.pick key=\(choice.key) panel=\(pid)")
-        CmuxIntegration.sendText(session: session, text: choice.key)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            CmuxIntegration.sendKey(session: session, key: "enter")
-        }
+        NSLog("[Clotch] ApprovalCard.pick key=\(choice.key) label=\(choice.label)")
+        onPick(choice)
         session.task = .working
         onDismiss()
+    }
+
+    private func shortenPath(_ p: String) -> String {
+        let home = NSHomeDirectory()
+        if p.hasPrefix(home) { return "~" + p.dropFirst(home.count) }
+        let comps = p.split(separator: "/")
+        if comps.count > 3 { return ".../" + comps.suffix(2).joined(separator: "/") }
+        return p
     }
 }
 

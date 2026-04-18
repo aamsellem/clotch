@@ -70,7 +70,13 @@
       "Bash(gh search *)",
       "Bash(env)",
       "Bash(rm -f /tmp/clotch.sock xcodegen generate)",
-      "Bash(/usr/bin/log show *)"
+      "Bash(/usr/bin/log show *)",
+      "Read(//tmp/**)",
+      "Bash(/Applications/cmux.app/Contents/Resources/bin/cmux --help)",
+      "Bash(security find-generic-password *)",
+      "Bash(defaults read *)",
+      "Bash(awk '/class: \"genp\"/,/^$/')",
+      "Bash(security dump-keychain *)"
     ],
     "defaultMode": "auto"
   }

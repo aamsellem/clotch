@@ -124,12 +124,12 @@ struct ExpandedPanelView: View {
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(TerminalColors.textTertiary)
-            TextField("send to Claude…", text: $commandText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(TerminalColors.text)
-                .focused($commandFocused)
-                .onSubmit { sendCommand() }
+            CmuxCommandField(
+                text: $commandText,
+                placeholder: "send to Claude…",
+                onSubmit: sendCommand
+            )
+            .frame(height: 20)
             if !commandText.isEmpty {
                 Button(action: sendCommand) {
                     Image(systemName: "arrow.up.circle.fill")

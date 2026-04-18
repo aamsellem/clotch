@@ -42,15 +42,15 @@ struct NotchContentView: View {
     // Dynamic size
     private var currentWidth: CGFloat {
         if panelManager.isExpanded { return NotchConstants.expandedSize.width }
-        if showCard { return 340 }
+        if showCard { return 360 }
         let base = notchWidth + (isHovering ? 16 : 0)
         return shouldPeek ? base + peekExtension : base
     }
     private var currentHeight: CGFloat {
         if panelManager.isExpanded { return NotchConstants.expandedSize.height }
         if showCard {
-            // Approval card is taller (context + 2 buttons); completion is shorter
-            if sessionStore.activeSession?.task == .waiting { return notchHeight + 110 }
+            // Approval card: header + tool badge + preview + 3 stacked buttons
+            if sessionStore.activeSession?.task == .waiting { return notchHeight + 210 }
             return notchHeight + 80
         }
         return notchHeight + (isHovering ? 6 : 0)
@@ -121,9 +121,15 @@ struct NotchContentView: View {
                 // Card surface (approval / completion) — shown without expanding the full panel
                 if let session = sessionStore.activeSession, !panelManager.isExpanded {
                     if session.task == .waiting {
-                        ApprovalCardView(session: session)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                            .onAppear { panelManager.activateForInteraction() }
+                        ApprovalCardView(
+                            session: session,
+                            onPick: { choice in
+                                resolvePermission(session: session, choice: choice)
+                            },
+                            choices: buildChoices()
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .onAppear { panelManager.activateForInteraction() }
                     } else if let until = session.showCompletionUntil, until > Date() {
                         CompletionCardView(
                             session: session,
@@ -151,6 +157,53 @@ struct NotchContentView: View {
         }
         .onHover { hovering in
             handleHover(hovering)
+        }
+    }
+
+    /// Build the card's choice list from the active permission request's suggestions
+    /// (or the default Yes/Yes+always/No set).
+    private func buildChoices() -> [CardChoice] {
+        guard let permission = panelManager.stateMachine.activePermission else {
+            return CardChoice.permissionDefaults
+        }
+        var choices: [CardChoice] = [.allow()]
+        for (i, suggestion) in permission.suggestions.prefix(3).enumerated() {
+            let ruleDesc = suggestion.rules.first.map { r -> String in
+                if let rc = r.ruleContent, !rc.isEmpty { return "\(r.toolName)(\(rc))" }
+                return r.toolName
+            } ?? suggestion.behavior
+            let label = "\(suggestion.behavior == "allow" ? "Allow" : "Deny") \(ruleDesc)"
+            choices.append(CardChoice(
+                label: label,
+                shortcut: "⌘\(i + 2)",
+                key: String(i + 2),
+                kind: suggestion.behavior == "allow" ? .allow : .deny
+            ))
+        }
+        choices.append(.deny())
+        return choices
+    }
+
+    private func resolvePermission(session: SessionData, choice: CardChoice) {
+        let sm = panelManager.stateMachine
+        // If we have an active PermissionRequest payload → resolve via bridge.
+        if let permission = sm.activePermission, let idx = Int(choice.key), idx >= 2, idx <= permission.suggestions.count + 1 {
+            let suggestion = permission.suggestions[idx - 2]
+            sm.resolveActivePermission(.allow(updatedPermissions: [suggestion]))
+            return
+        }
+        if sm.activePermission != nil {
+            switch choice.kind {
+            case .allow:  sm.resolveActivePermission(.allow())
+            case .deny:   sm.resolveActivePermission(.deny(message: "User denied"))
+            case .neutral: sm.resolveActivePermission(.allow())
+            }
+            return
+        }
+        // Legacy path: Notification-based card — fall back to keystroke injection.
+        CmuxIntegration.sendText(session: session, text: choice.key)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            CmuxIntegration.sendKey(session: session, key: "enter")
         }
     }
 

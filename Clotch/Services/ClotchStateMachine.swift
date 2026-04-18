@@ -15,6 +15,12 @@ final class ClotchStateMachine {
     /// Current global spinner verb
     var spinnerVerb: String = "Idle"
 
+    /// Back-reference to the socket server so we can resolve permission requests from the UI.
+    weak var socketServer: SocketServer?
+
+    /// The active permission request awaiting user decision (if any).
+    var activePermission: PermissionRequestPayload?
+
     init(
         sessionStore: SessionStore,
         sentimentAnalyzer: SentimentAnalyzer,
@@ -33,6 +39,42 @@ final class ClotchStateMachine {
         self.settings = settings
 
         soundService.configure(settings: settings, terminalFocusDetector: terminalFocusDetector)
+    }
+
+    /// Handle a PermissionRequest payload — sets up the session for the approval card.
+    func handlePermissionRequest(_ payload: PermissionRequestPayload) {
+        let session = sessionStore.getOrCreate(id: payload.sessionId)
+
+        if let cwd = payload.cwd {
+            if session.cwd == nil { session.cwd = cwd }
+            if session.projectName == nil {
+                session.projectName = (cwd as NSString).lastPathComponent
+            }
+        }
+        if let pid = payload.cmuxPanelId, !pid.isEmpty { session.cmuxPanelId = pid }
+        if let wid = payload.cmuxWorkspaceId, !wid.isEmpty { session.cmuxWorkspaceId = wid }
+
+        session.currentTool = payload.toolName
+        let (preview, path) = ToolInputPreview.extract(tool: payload.toolName, rawJSON: payload.toolInputRaw)
+        session.currentToolPreview = preview
+        session.currentToolPath = path
+        session.task = .waiting
+
+        activePermission = payload
+        soundService.playPeekSound()
+    }
+
+    /// Resolve the currently-active permission request with the user's decision.
+    func resolveActivePermission(_ decision: PermissionDecision) {
+        guard let payload = activePermission else {
+            print("[Clotch] resolveActivePermission: no active permission")
+            return
+        }
+        socketServer?.resolvePermission(requestId: payload.requestId, decision: decision)
+        activePermission = nil
+        if let session = sessionStore.sessions[payload.sessionId] {
+            session.task = .working
+        }
     }
 
     /// Handle an incoming hook event
@@ -168,6 +210,11 @@ final class ClotchStateMachine {
             session.currentTool = event.tool
             spinnerVerb = SpinnerVerbs.random(for: event.tool)
         }
+        // Extract a short preview + path from the tool_input so the approval
+        // card can show what the user is being asked to validate.
+        let (preview, path) = ToolInputPreview.extract(tool: event.tool, rawJSON: event.toolInput)
+        session.currentToolPreview = preview
+        session.currentToolPath = path
         session.cancelSleepTimer()
 
         if let tool = event.tool {

@@ -62,9 +62,18 @@ final class HookInstaller {
             try Self.hookScript.write(toFile: scriptPath, atomically: true, encoding: .utf8)
         }
 
-        // Make executable
         let attrs: [FileAttributeKey: Any] = [.posixPermissions: 0o755]
         try FileManager.default.setAttributes(attrs, ofItemAtPath: scriptPath)
+
+        // Also install the permission hook (waits for Clotch UI decision, writes JSON decision on stdout)
+        let permScriptPath = "\(hooksDir)/clotch-permission-hook.sh"
+        if let bundled = Bundle.main.path(forResource: "clotch-permission-hook", ofType: "sh") {
+            try? FileManager.default.removeItem(atPath: permScriptPath)
+            try FileManager.default.copyItem(atPath: bundled, toPath: permScriptPath)
+        } else {
+            try Self.permissionHookScript.write(toFile: permScriptPath, atomically: true, encoding: .utf8)
+        }
+        try FileManager.default.setAttributes(attrs, ofItemAtPath: permScriptPath)
     }
 
     private func registerInSettings() throws {
@@ -116,6 +125,27 @@ final class HookInstaller {
             eventEntries.append(clotchNestedEntry)
             hooks[eventType] = eventEntries
         }
+
+        // Install the dedicated PermissionRequest hook with a long timeout so the
+        // user has time to pick a choice in the approval card.
+        let permissionHookPath = hookPath.replacingOccurrences(of: "clotch-hook.sh", with: "clotch-permission-hook.sh")
+        let permissionEntry: [String: Any] = [
+            "hooks": [[
+                "type": "command",
+                "command": permissionHookPath,
+                "timeout": 60000
+            ]]
+        ]
+        var permEntries = hooks["PermissionRequest"] as? [[String: Any]] ?? []
+        permEntries.removeAll { entry in
+            if let cmd = entry["command"] as? String, cmd.contains("clotch") { return true }
+            if let nested = entry["hooks"] as? [[String: Any]] {
+                return nested.contains { ($0["command"] as? String)?.contains("clotch") == true }
+            }
+            return false
+        }
+        permEntries.append(permissionEntry)
+        hooks["PermissionRequest"] = permEntries
 
         settings["hooks"] = hooks
 
@@ -192,4 +222,53 @@ final class HookInstaller {
     " &
     exit 0
     """
+
+    /// PermissionRequest hook: sends payload to Clotch, waits for decision, outputs JSON on stdout.
+    static let permissionHookScript = #"""
+    #!/bin/bash
+    SOCKET="/tmp/clotch.sock"
+    [ ! -S "$SOCKET" ] && exit 0
+    INPUT=$(cat)
+    export CLOTCH_RAW_INPUT="$INPUT"
+    export CLOTCH_CMUX_PANEL_ID="${CMUX_PANEL_ID:-}"
+    export CLOTCH_CMUX_WORKSPACE_ID="${CMUX_WORKSPACE_ID:-}"
+    python3 <<'PYEOF'
+    import json, os, socket, sys, uuid
+    raw = os.environ.get('CLOTCH_RAW_INPUT', '')
+    try: data = json.loads(raw) if raw.strip() else {}
+    except Exception: data = {}
+    request_id = str(uuid.uuid4())
+    payload = {
+        'kind': 'permission_request',
+        'request_id': request_id,
+        'session_id': data.get('session_id', 'unknown'),
+        'tool_name': data.get('tool_name'),
+        'tool_input': data.get('tool_input'),
+        'permission_suggestions': data.get('permission_suggestions', []),
+        'cwd': data.get('cwd'),
+        'cmux_panel_id': os.environ.get('CLOTCH_CMUX_PANEL_ID') or None,
+        'cmux_workspace_id': os.environ.get('CLOTCH_CMUX_WORKSPACE_ID') or None,
+    }
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(55)
+        s.connect('/tmp/clotch.sock')
+        s.sendall((json.dumps(payload) + '\n').encode())
+        buf = b''
+        while b'\n' not in buf:
+            chunk = s.recv(4096)
+            if not chunk: break
+            buf += chunk
+        s.close()
+        line = buf.split(b'\n', 1)[0].decode()
+        resp = json.loads(line) if line else {}
+        decision = resp.get('decision')
+        if decision:
+            out = {'hookSpecificOutput': {'hookEventName': 'PermissionRequest', 'decision': decision}}
+            sys.stdout.write(json.dumps(out))
+    except Exception:
+        pass
+    sys.exit(0)
+    PYEOF
+    """#
 }
