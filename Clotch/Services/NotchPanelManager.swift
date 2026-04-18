@@ -20,6 +20,9 @@ final class NotchPanelManager {
     var notchRect: CGRect = .zero
     /// The expanded panel rect
     var panelRect: CGRect = .zero
+    /// Extra interactive area when a card is shown below the notch.
+    /// The card extends downward from the notch bottom edge.
+    var cardRect: CGRect = .zero
     /// The notch size detected from the screen
     var notchSize: CGSize = .zero
     /// The screen frame
@@ -97,6 +100,27 @@ final class NotchPanelManager {
             width: panelWidth,
             height: Self.expandedPanelSize.height
         )
+
+        // Card area: 340 wide, starts at notch bottom and extends 150pt down
+        let cardWidth: CGFloat = 360
+        let cardHeight: CGFloat = 160
+        cardRect = CGRect(
+            x: notchCenterX - cardWidth / 2,
+            y: screenFrame.maxY - notchSize.height - cardHeight,
+            width: cardWidth,
+            height: notchSize.height + cardHeight
+        )
+    }
+
+    /// Whether a card (approval/completion) is currently visible in any session
+    var isCardVisible: Bool {
+        guard !isExpanded else { return false }
+        let now = Date()
+        for session in sessionStore.sessions.values {
+            if session.task == .waiting { return true }
+            if let until = session.showCompletionUntil, until > now { return true }
+        }
+        return false
     }
 
     func showPanel() {

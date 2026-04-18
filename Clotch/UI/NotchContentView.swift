@@ -93,9 +93,14 @@ struct NotchContentView: View {
             Color(red: 0.05, green: 0.05, blue: 0.07)
 
             VStack(spacing: 0) {
-                // Header row (always visible, matches notch height)
+                // Header row (always visible, matches notch height).
+                // Tap-to-toggle only lives here so it doesn't eat clicks on cards/buttons.
                 headerRow
                     .frame(height: notchHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        panelManager.isExpanded.toggle()
+                    }
 
                 // Card surface (approval / completion) — shown without expanding the full panel
                 if let session = sessionStore.activeSession, !panelManager.isExpanded {
@@ -132,9 +137,6 @@ struct NotchContentView: View {
             if !panelManager.isExpanded {
                 isHovering = hovering
             }
-        }
-        .onTapGesture {
-            panelManager.isExpanded.toggle()
         }
     }
 

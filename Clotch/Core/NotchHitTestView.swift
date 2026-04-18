@@ -15,7 +15,14 @@ final class NotchHitTestView: NSView {
         let screenPoint = window.convertPoint(toScreen: windowPoint)
 
         // Determine the active interactive area
-        let activeRect = manager.isExpanded ? manager.panelRect : manager.notchRect
+        let activeRect: CGRect
+        if manager.isExpanded {
+            activeRect = manager.panelRect
+        } else if manager.isCardVisible {
+            activeRect = manager.cardRect  // notch + card extension
+        } else {
+            activeRect = manager.notchRect
+        }
 
         guard activeRect.contains(screenPoint) else {
             return nil  // Click passes through to apps below
